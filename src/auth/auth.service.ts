@@ -5,10 +5,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { UserLoginDto } from './dto/user-login.dto';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private jwtService: JwtService,
+  ) {}
 
   async register(registerDto: UserRegisterDto) {
     const { email, password, name } = registerDto;
@@ -17,7 +21,10 @@ export class AuthService {
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new this.userModel({ email, password: hashedPassword, name });
-    return { message: 'User registered successfully', user: user.save() };
+    const savedUser = await user.save();
+    const payload = { sub: savedUser._id, email: savedUser.email };
+    const token = this.jwtService.sign(payload);
+    return { message: 'User registered successfully', user: savedUser, token };
   }
 
   async login(loginDto: UserLoginDto) {
@@ -30,6 +37,8 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new BadRequestException('Invalid credentials');
     }
-    return { message: 'User logged in successfully', user };
+    const payload = { sub: user._id, email: user.email };
+    const token = this.jwtService.sign(payload);
+    return { message: 'User logged in successfully', user, token };
   }
 }
