@@ -15,14 +15,27 @@ export class AuthService {
   ) {}
 
   async register(registerDto: UserRegisterDto) {
-    const { email, password, name } = registerDto;
+    const { email, password, name, username } = registerDto;
     if (await this.userModel.findOne({ email })) {
       throw new BadRequestException('Email already exists');
     }
+    if (await this.userModel.findOne({ username })) {
+      throw new BadRequestException('Username already exists');
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new this.userModel({ email, password: hashedPassword, name });
+    const user = new this.userModel({
+      email,
+      password: hashedPassword,
+      name,
+      username,
+    });
     const savedUser = await user.save();
-    const payload = { sub: savedUser._id, email: savedUser.email };
+    const payload = {
+      sub: savedUser._id,
+      email: savedUser.email,
+      name: savedUser.name,
+      username: savedUser.username,
+    };
     const token = this.jwtService.sign(payload);
     return { message: 'User registered successfully', user: savedUser, token };
   }
@@ -37,7 +50,12 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new BadRequestException('Invalid credentials');
     }
-    const payload = { sub: user._id, email: user.email };
+    const payload = {
+      sub: user._id,
+      email: user.email,
+      name: user.name,
+      username: user.username,
+    };
     const token = this.jwtService.sign(payload);
     return { message: 'User logged in successfully', user, token };
   }
