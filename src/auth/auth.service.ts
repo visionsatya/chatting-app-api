@@ -1,4 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { UserRegisterDto } from './dto/user-register.dto';
+import { User, UserDocument } from './schemas/user.schema.js';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import * as bcrypt from 'bcryptjs';
+import { UserLoginDto } from './dto/user-login.dto';
 
 @Injectable()
-export class AuthService {}
+export class AuthService {
+  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+
+  async register(registerDto: UserRegisterDto) {
+    const { email, password, name } = registerDto;
+    if (await this.userModel.findOne({ email })) {
+      throw new BadRequestException('Email already exists');
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new this.userModel({ email, password: hashedPassword, name });
+    return { message: 'User registered successfully', user: user.save() };
+  }
+
+  async login(loginDto: UserLoginDto) {
+    const { email, password } = loginDto;
+    const user = await this.userModel.findOne({ email });
+    if (!user) {
+      throw new BadRequestException('Invalid credentials');
+    }
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid credentials');
+    }
+    return { message: 'User logged in successfully', user };
+  }
+}
